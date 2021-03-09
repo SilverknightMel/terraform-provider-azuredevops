@@ -22,6 +22,7 @@ import (
 	"github.com/microsoft/azure-devops-go-api/azuredevops/serviceendpoint"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/taskagent"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/workitemtracking"
+	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/internal/service/pipelines"
 	"github.com/microsoft/terraform-provider-azuredevops/version"
 )
 
@@ -36,6 +37,7 @@ type AggregatedClient struct {
 	OrganizationURL               string
 	CoreClient                    core.Client
 	BuildClient                   build.Client
+	PipelineClient                pipelines.Client
 	GitReposClient                git.Client
 	GraphClient                   graph.Client
 	OperationsClient              operations.Client
@@ -81,6 +83,13 @@ func GetAzdoClient(azdoPAT string, organizationURL string, tfVersion string) (*A
 		log.Printf("getAzdoClient(): build.NewClient failed.")
 		return nil, err
 	}
+
+	pipelineClient, err := pipelines.NewClient(ctx, connection)
+	if err != nil {
+		log.Printf("getAzdoClient(): pipelines.NewClient failed.")
+		return nil, err
+	}
+
 
 	// client for these APIs (monitor async operations...):
 	//	https://docs.microsoft.com/en-us/rest/api/azure/devops/operations/operations?view=azure-devops-rest-5.1
@@ -156,6 +165,7 @@ func GetAzdoClient(azdoPAT string, organizationURL string, tfVersion string) (*A
 		OrganizationURL:               organizationURL,
 		CoreClient:                    coreClient,
 		BuildClient:                   buildClient,
+		PipelineClient:                pipelineClient,
 		GitReposClient:                gitReposClient,
 		GraphClient:                   graphClient,
 		OperationsClient:              operationsClient,

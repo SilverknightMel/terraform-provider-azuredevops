@@ -5,6 +5,8 @@ PKG_NAME=azuredevops
 TESTTIMEOUT=180m
 TESTTAGS=all
 
+
+
 ifeq ($(GOPATH),)
 	GOPATH:=$(shell go env GOPATH)
 endif
@@ -27,6 +29,7 @@ tools:
 
 build: fmtcheck check-vendor-vs-mod
 	go install
+
 
 fmt:
 	@echo "==> Fixing source code with gofmt..."

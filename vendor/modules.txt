@@ -79,7 +79,7 @@ github.com/google/go-cmp/cmp/internal/diff
 github.com/google/go-cmp/cmp/internal/flags
 github.com/google/go-cmp/cmp/internal/function
 github.com/google/go-cmp/cmp/internal/value
-# github.com/google/uuid v1.1.1
+# github.com/google/uuid v1.2.0
 ## explicit
 github.com/google/uuid
 # github.com/googleapis/gax-go/v2 v2.0.5
@@ -200,7 +200,7 @@ github.com/jmespath/go-jmespath
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.5
 github.com/mattn/go-isatty
-# github.com/microsoft/azure-devops-go-api/azuredevops v1.0.0-b3
+# github.com/microsoft/azure-devops-go-api/azuredevops v1.0.0-b5
 ## explicit
 github.com/microsoft/azure-devops-go-api/azuredevops
 github.com/microsoft/azure-devops-go-api/azuredevops/accounts
@@ -218,6 +218,7 @@ github.com/microsoft/azure-devops-go-api/azuredevops/licensing
 github.com/microsoft/azure-devops-go-api/azuredevops/licensingrule
 github.com/microsoft/azure-devops-go-api/azuredevops/memberentitlementmanagement
 github.com/microsoft/azure-devops-go-api/azuredevops/operations
+github.com/microsoft/azure-devops-go-api/azuredevops/pipelines
 github.com/microsoft/azure-devops-go-api/azuredevops/policy
 github.com/microsoft/azure-devops-go-api/azuredevops/profile
 github.com/microsoft/azure-devops-go-api/azuredevops/release

@@ -2,7 +2,6 @@
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/resource"
@@ -104,7 +103,7 @@ func resourceAzureRunPipelineCreate(d *schema.ResourceData, m interface{}) error
 
 	//flattenRunPipeline(d, createdRunPipeline, projectName)
 
-	err := waitForRunPipeline(clients, createdRunPipeline,projectName,PipelineId)
+	err = waitForRunPipeline(clients, createdRunPipeline,projectName,PipelineId)
 	if err != nil {
 		return err
 	}
@@ -121,7 +120,7 @@ func waitForRunPipeline(clients *client.AggregatedClient, createdRunPipeline *pi
 		Target:  []string{"Completed"},
 		Refresh: func() (interface{}, string, error) {
 			state := "InProgress"
-			pipelineStatus, err := pipelineStatusRead(clients, project_Name, Pipeline_Id,runID)
+			pipelineStatus, err := pipelineStatusRead(clients, project_Name, Pipeline_Id,*runID)
 			if err != nil {
 				return nil, "", fmt.Errorf("Error reading repository: %+v", err)
 			}
@@ -138,7 +137,7 @@ func waitForRunPipeline(clients *client.AggregatedClient, createdRunPipeline *pi
 		ContinuousTargetOccurence: 1,
 	}
 	if _, err := stateConf.WaitForState(); err != nil {
-		return fmt.Errorf("Error retrieving expected branch for repository [%s]: %+v", *repoName, err)
+		return fmt.Errorf("Error retrieving expected branch for repository [%s]: %+v", err)
 	}
 	return nil
 }
@@ -171,16 +170,19 @@ func createAzureRunPipeline(clients *client.AggregatedClient, RunPipeline *pipel
 
 func resourceAzureRunPipelineRead(d *schema.ResourceData, m interface{}) error {
 	clients := m.(*client.AggregatedClient)
-	projectID, runPipelinesID, err := tfhelper.ParseProjectIDAndResourceID(d)
+	Project_name := d.Get("project_name").(string)
+	Pipeline_Id := d.Get("pipeline_id").(int)
 
-	if err != nil {
-		return err
+	getPipelineArgs := pipelines.GetPipelineArgs{
+		Project: &Project_name,
+		PipelineId: &Pipeline_Id,
+
 	}
 
-	RunPipeline, err := clients.BuildClient.GetDefinition(clients.Ctx, pipelines.RunPipelineArgs{
-		Project:      &projectID,
-		DefinitionId: &runPipelinesID,
-	})
+	//projectID, runPipelinesID, err := tfhelper.ParseProjectIDAndResourceID(d)
+
+
+	RunPipeline, err := clients.PipelineClient.GetPipeline (clients.Ctx, getPipelineArgs)
 
 	if err != nil {
 		if utils.ResponseWasNotFound(err) {
@@ -189,14 +191,19 @@ func resourceAzureRunPipelineRead(d *schema.ResourceData, m interface{}) error {
 		}
 		return err
 	}
+	d.Set("name", RunPipeline.Name)
+	d.Set("Folder ", RunPipeline.Folder )
+	d.Set("Id", RunPipeline.Id)
+	d.Set("Url", RunPipeline.Url)
 
-	flattenRunPipeline(d, RunPipeline, projectID)
+
+	//flattenRunPipeline(d, RunPipeline, projectID)
 	return nil
 }
 
 
 
-func flattenRunPipeline(d *schema.ResourceData, buildDefinition *pipelines.RunPipelineArgs, projectID string) {
+/* func flattenRunPipeline(d *schema.ResourceData, buildDefinition *pipelines.RunPipelineArgs, projectID string) {
 	d.SetId(strconv.Itoa(*buildDefinition.Id))
 
 	d.Set("project_id", projectID)
@@ -225,7 +232,7 @@ func flattenRunPipeline(d *schema.ResourceData, buildDefinition *pipelines.RunPi
 	}
 
 	d.Set("revision", revision)
-}
+} */
 
 
 func flattenRunPipelineVariables(d *schema.ResourceData, buildDefinition *build.BuildDefinition) interface{} {
@@ -262,19 +269,24 @@ func flattenRunPipelineVariables(d *schema.ResourceData, buildDefinition *build.
 func expandRunPipeline(d *schema.ResourceData, forCreate bool) (*pipelines.RunPipelineParameters  , string, int, error) {
 	Project := d.Get("project_name").(string)
 	variables, err := expandVariables(d)
+	Ref_Name := converter.String(d.Get("sourceBranch").(string))
+	token:= converter.String(d.Get("parameter_accessKey").(string))
 	PipelineId := d.Get("pipeline_id").(int)
 	if err != nil {
 		return nil, "",0,fmt.Errorf("Error expanding varibles: %+v", err)
 	}
-	RunPipeline := pipelines.RunPipelineParameters{
-		Resources: &pipelines.RunResourcesParameters{
-			Repositories: &pipelines.RepositoryResourceParameters{
-				RefName: converter.String(d.Get("sourceBranch").(string)),
-				//Token: converter.String(d.Get("parameter_accessKey").(string)),
-			},
+	RunResource := pipelines.RunResourcesParameters{
+		Repositories: pipelines.RepositoryResourceParameters{
+			RefName: Ref_Name,
+			Token: token,
 		},
-		Variables: variables,
-	}
+		}
+
+		RunPipeline := pipelines.RunPipelineParameters{
+			Resources: RunResource
+
+			Variables: variables,
+		}
 
 
 

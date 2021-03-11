@@ -2,6 +2,7 @@
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/resource"
@@ -10,7 +11,6 @@ import (
 	"github.com/microsoft/azure-devops-go-api/azuredevops/build"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/pipelines"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/internal/client"
-	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/internal/pipelines"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/internal/utils"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/internal/utils/converter"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/internal/utils/tfhelper"
@@ -108,7 +108,7 @@ func resourceAzureRunPipelineCreate(d *schema.ResourceData, m interface{}) error
 		return err
 	}
 
-	d.SetId(createdRunPipeline.Id.String())
+	d.SetId(strconv.Itoa(*createdRunPipeline.Id))
 	return resourceAzureRunPipelineRead(d, m)
 }
 
@@ -157,7 +157,7 @@ func pipelineStatusRead(clients *client.AggregatedClient, project_Name string, P
 	return runStatus,err
 }
 
-func createAzureRunPipeline(clients *client.AggregatedClient, RunPipeline *pipelines.RunPipelineParameters, projectName string, Pipeline_Id int ) (*pipelines.run, error) {
+func createAzureRunPipeline(clients *client.AggregatedClient, RunPipeline *pipelines.RunPipelineParameters, projectName string, Pipeline_Id int ) (*pipelines.Run, error) {
 	createRunPipeline, err := clients.PipelineClient.RunPipeline(clients.Ctx, pipelines.RunPipelineArgs{
 		RunParameters: RunPipeline,
 		Project:    &projectName,
@@ -275,15 +275,19 @@ func expandRunPipeline(d *schema.ResourceData, forCreate bool) (*pipelines.RunPi
 	if err != nil {
 		return nil, "",0,fmt.Errorf("Error expanding varibles: %+v", err)
 	}
+	Repository_resource :=pipelines.RepositoryResourceParameters{
+		RefName: Ref_Name,
+		Token: token,
+
+	}
 	RunResource := pipelines.RunResourcesParameters{
-		Repositories: pipelines.RepositoryResourceParameters{
-			RefName: Ref_Name,
-			Token: token,
-		},
+		Repositories: &Repository_resource,
+
 		}
 
+
 		RunPipeline := pipelines.RunPipelineParameters{
-			Resources: RunResource
+			Resources: &RunResource,
 
 			Variables: variables,
 		}

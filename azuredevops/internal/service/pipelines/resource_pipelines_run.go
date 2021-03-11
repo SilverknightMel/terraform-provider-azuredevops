@@ -2,12 +2,19 @@
 
 import (
 	"fmt"
+	"strconv"
+	"time"
 
+	"github.com/hashicorp/terraform-plugin-sdk/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/validation"
-	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/internal/pipelines"
+	"github.com/microsoft/azure-devops-go-api/azuredevops/build"
+	"github.com/microsoft/azure-devops-go-api/azuredevops/pipelines"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/internal/client"
+	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/internal/pipelines"
+	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/internal/utils"
 	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/internal/utils/converter"
+	"github.com/microsoft/terraform-provider-azuredevops/azuredevops/internal/utils/tfhelper"
 )
 
 const (
@@ -24,13 +31,13 @@ func ResourceRunPipeline() *schema.Resource {
 	return &schema.Resource{
 		Create: resourceAzureRunPipelineCreate,
 		Read:   resourceAzureRunPipelineRead,
-		Update: resourceAzureRunPipelineUpdate,
-		Delete: resourceAzureRunPipelineDelete,
+		Update: resourceAzureRunPipelineRead,
+		Delete: resourceAzureRunPipelineRead,
 		Importer: &schema.ResourceImporter{
 			State: schema.ImportStatePassthrough,
 		},
 		Schema: map[string]*schema.Schema{
-			"build_id": {
+			"pipeline_id": {
 				Type:         schema.TypeString,
 				ForceNew:     false,
 				Required:     true,
@@ -77,128 +84,193 @@ func ResourceRunPipeline() *schema.Resource {
 					},
 				},
 			},
-			"parameter_terraformIntent": {
-				Type:         schema.TypeString,
-				ForceNew:     false,
-				Required:     true,
-				ValidateFunc: validation.StringIsNotWhiteSpace,
-			},
-			"parameter_customerServiceConnectionName": {
-				Type:         schema.TypeString,
-				ForceNew:     false,
-				Required:     true,
-				ValidateFunc: validation.StringIsNotWhiteSpace,
-			},
-			"parameter_projectOwner": {
-				Type:         schema.TypeString,
-				ForceNew:     false,
-				Required:     true,
-				ValidateFunc: validation.StringIsNotWhiteSpace,
-			},
-			"parameter_artifactoryDir": {
-				Type:         schema.TypeString,
-				ForceNew:     false,
-				Required:     true,
-				ValidateFunc: validation.StringIsNotWhiteSpace,
-			},
-			"parameter_artifactoryKey": {
-				Type:         schema.TypeString,
-				ForceNew:     false,
-				Required:     true,
-				ValidateFunc: validation.StringIsNotWhiteSpace,
-			},
-			"parameter_operateServerNames": {
-				Type:         schema.TypeString,
-				ForceNew:     false,
-				Required:     true,
-				ValidateFunc: validation.StringIsNotWhiteSpace,
-			},
-			"parameter_serverOperation": {
-				Type:         schema.TypeString,
-				ForceNew:     false,
-				Required:     true,
-				ValidateFunc: validation.StringIsNotWhiteSpace,
-			},
-			"parameter_rgName": {
-				Type:         schema.TypeString,
-				ForceNew:     false,
-				Required:     true,
-				ValidateFunc: validation.StringIsNotWhiteSpace,
-			},
-			"parameter_accessKey": {
-				Type:         schema.TypeString,
-				ForceNew:     false,
-				Required:     true,
-				ValidateFunc: validation.StringIsNotWhiteSpace,
-			},
-			"parameter_ARM_CLIENT_ID": {
-				Type:         schema.TypeString,
-				ForceNew:     false,
-				Required:     true,
-				ValidateFunc: validation.StringIsNotWhiteSpace,
-			},
-			"parameter_clientSec": {
-				Type:         schema.TypeString,
-				ForceNew:     false,
-				Required:     true,
-				ValidateFunc: validation.StringIsNotWhiteSpace,
-			},
-			"parameter_Maintenanceminutes": {
-				Type:         schema.TypeString,
-				ForceNew:     false,
-				Required:     true,
-				ValidateFunc: validation.StringIsNotWhiteSpace,
-			},
-			"parameter_comment": {
-				Type:         schema.TypeString,
-				ForceNew:     false,
-				Required:     true,
-				ValidateFunc: validation.StringIsNotWhiteSpace,
-			},
+
 
 		},
 	}
 }
 func resourceAzureRunPipelineCreate(d *schema.ResourceData, m interface{}) error {
 	clients := m.(*client.AggregatedClient)
- 	RunPipeline, err := expandRunPipeline(d, true)
-	projectName := converter.String(d.Get("project_name").(string)),
+ 	RunPipeline, projectName,PipelineId,err := expandRunPipeline(d, true)
+
 	if err != nil {
 		return fmt.Errorf("Error converting terraform data model to AzDO RunPipeline reference: %+v", err)
 	}
 
-	createdRunPipeline, err := createAzureRunPipeline(clients, RunPipeline, projectName)
+	createdRunPipeline, err := createAzureRunPipeline(clients, RunPipeline, projectName,PipelineId)
 	if err != nil {
 		return fmt.Errorf("Error creating agent pool in Azure DevOps: %+v", err)
 	}
 
+	//flattenRunPipeline(d, createdRunPipeline, projectName)
 
+	err := waitForRunPipeline(clients, createdRunPipeline,projectName,PipelineId)
+	if err != nil {
+		return err
+	}
+
+	d.SetId(createdRunPipeline.Id.String())
 	return resourceAzureRunPipelineRead(d, m)
 }
 
-func createAzureRunPipeline(clients *client.AggregatedClient, RunPipeline *pipelines.RunPipelineParameters, project string ) (*pipelines.run, error) {
-	createRunPipeline, err := clients.BuildClient.
-	
-	args := taskagent.AddRunPipelineArgs{
-		Pool: RunPipeline,
+
+func waitForRunPipeline(clients *client.AggregatedClient, createdRunPipeline *pipelines.Run,project_Name string, Pipeline_Id int) error {
+	runID := createdRunPipeline.Id
+	stateConf := &resource.StateChangeConf{
+		Pending: []string{"InProgress","Canceling","Unknown"},
+		Target:  []string{"Completed"},
+		Refresh: func() (interface{}, string, error) {
+			state := "InProgress"
+			pipelineStatus, err := pipelineStatusRead(clients, project_Name, Pipeline_Id,runID)
+			if err != nil {
+				return nil, "", fmt.Errorf("Error reading repository: %+v", err)
+			}
+
+			if converter.ToString((*string)(pipelineStatus.State), "") == "Completed" {
+				state = "Completed"
+			}
+
+			return state, state, nil
+		},
+		Timeout:                   60 * time.Second,
+		MinTimeout:                2 * time.Second,
+		Delay:                     1 * time.Second,
+		ContinuousTargetOccurence: 1,
+	}
+	if _, err := stateConf.WaitForState(); err != nil {
+		return fmt.Errorf("Error retrieving expected branch for repository [%s]: %+v", *repoName, err)
+	}
+	return nil
+}
+
+func pipelineStatusRead(clients *client.AggregatedClient, project_Name string, Pipeline_Id int, run_ID int) (*pipelines.Run, error) {
+	getRunArgs := pipelines.GetRunArgs{
+		Project: &project_Name,
+		PipelineId: &Pipeline_Id,
 	}
 
-	newTaskAgent, err := clients.TaskAgentClient.AddRunPipeline(clients.Ctx, args)
-	return newTaskAgent, err
+	runStatus,err := clients.PipelineClient.GetRun(clients.Ctx, getRunArgs)
+
+	if err != nil {
+		return nil,fmt.Errorf("Failed to locate parent repository [%s]: %+v")
+	}
+
+	return runStatus,err
+}
+
+func createAzureRunPipeline(clients *client.AggregatedClient, RunPipeline *pipelines.RunPipelineParameters, projectName string, Pipeline_Id int ) (*pipelines.run, error) {
+	createRunPipeline, err := clients.PipelineClient.RunPipeline(clients.Ctx, pipelines.RunPipelineArgs{
+		RunParameters: RunPipeline,
+		Project:    &projectName,
+		PipelineId: &Pipeline_Id,
+
+	})
+
+	return createRunPipeline, err
+}
+
+func resourceAzureRunPipelineRead(d *schema.ResourceData, m interface{}) error {
+	clients := m.(*client.AggregatedClient)
+	projectID, runPipelinesID, err := tfhelper.ParseProjectIDAndResourceID(d)
+
+	if err != nil {
+		return err
+	}
+
+	RunPipeline, err := clients.BuildClient.GetDefinition(clients.Ctx, pipelines.RunPipelineArgs{
+		Project:      &projectID,
+		DefinitionId: &runPipelinesID,
+	})
+
+	if err != nil {
+		if utils.ResponseWasNotFound(err) {
+			d.SetId("")
+			return nil
+		}
+		return err
+	}
+
+	flattenRunPipeline(d, RunPipeline, projectID)
+	return nil
 }
 
 
-func expandRunPipeline(d *schema.ResourceData, forCreate bool) (*pipelines.RunPipelineParameters  , error) {
 
+func flattenRunPipeline(d *schema.ResourceData, buildDefinition *pipelines.RunPipelineArgs, projectID string) {
+	d.SetId(strconv.Itoa(*buildDefinition.Id))
+
+	d.Set("project_id", projectID)
+	d.Set("name", *buildDefinition.Name)
+	d.Set("path", *buildDefinition.Path)
+	//d.Set("repository", flattenRepository(buildDefinition))
+
+	if buildDefinition.Queue != nil && buildDefinition.Queue.Pool != nil {
+		d.Set("agent_pool_name", *buildDefinition.Queue.Pool.Name)
+	}
+
+	//d.Set("variable_groups", flattenVariableGroups(buildDefinition))
+	d.Set(rpVariable, flattenRunPipelineVariables(d, buildDefinition))
+
+	if buildDefinition.Triggers != nil {
+		yamlCiTrigger := hasSettingsSourceType(buildDefinition.Triggers, build.DefinitionTriggerTypeValues.ContinuousIntegration, 2)
+		d.Set("ci_trigger", flattenBuildDefinitionTriggers(buildDefinition.Triggers, yamlCiTrigger, build.DefinitionTriggerTypeValues.ContinuousIntegration))
+
+		yamlPrTrigger := hasSettingsSourceType(buildDefinition.Triggers, build.DefinitionTriggerTypeValues.PullRequest, 2)
+		d.Set("pull_request_trigger", flattenBuildDefinitionTriggers(buildDefinition.Triggers, yamlPrTrigger, build.DefinitionTriggerTypeValues.PullRequest))
+	}
+
+	revision := 0
+	if buildDefinition.Revision != nil {
+		revision = *buildDefinition.Revision
+	}
+
+	d.Set("revision", revision)
+}
+
+
+func flattenRunPipelineVariables(d *schema.ResourceData, buildDefinition *build.BuildDefinition) interface{} {
+	if buildDefinition.Variables == nil {
+		return nil
+	}
+	variables := make([]map[string]interface{}, len(*buildDefinition.Variables))
+
+	index := 0
+	for varName, varVal := range *buildDefinition.Variables {
+		var variable map[string]interface{}
+
+		isSecret := converter.ToBool(varVal.IsSecret, false)
+		variable = map[string]interface{}{
+			rpVariableName:          varName,
+			rpVariableValue:         converter.ToString(varVal.Value, ""),
+			rpVariableIsSecret:      isSecret,
+		}
+
+		//read secret variable from state if exist
+		if isSecret {
+			if stateVal := tfhelper.FindMapInSetWithGivenKeyValue(d, rpVariable, rpVariableName, varName); stateVal != nil {
+				variable = stateVal
+			}
+		}
+		variables[index] = variable
+		index = index + 1
+	}
+
+	return variables
+}
+
+
+func expandRunPipeline(d *schema.ResourceData, forCreate bool) (*pipelines.RunPipelineParameters  , string, int, error) {
+	Project := d.Get("project_name").(string)
 	variables, err := expandVariables(d)
+	PipelineId := d.Get("pipeline_id").(int)
 	if err != nil {
-		return "", fmt.Errorf("Error expanding varibles: %+v", err)
+		return nil, "",0,fmt.Errorf("Error expanding varibles: %+v", err)
 	}
 	RunPipeline := pipelines.RunPipelineParameters{
 		Resources: &pipelines.RunResourcesParameters{
 			Repositories: &pipelines.RepositoryResourceParameters{
-			RefName: converter.String(d.Get("sourceBranch").(string)),
-			Token: converter.String(d.Get("parameter_accessKey").(string)),
+				RefName: converter.String(d.Get("sourceBranch").(string)),
+				//Token: converter.String(d.Get("parameter_accessKey").(string)),
 			},
 		},
 		Variables: variables,
@@ -206,7 +278,7 @@ func expandRunPipeline(d *schema.ResourceData, forCreate bool) (*pipelines.RunPi
 
 
 
-	return &RunPipeline,nil
+	return &RunPipeline, Project ,PipelineId,nil
 }
 
 

@@ -17,11 +17,11 @@ import (
 )
 
 const (
-	rpVariable              = "variable"
-	rpVariableName          = "name"
-	rpVariableValue         = "value"
-	rpSecretVariableValue   = "secret_value"
-	rpVariableIsSecret      = "is_secret"
+	rpVariable            = "variable"
+	rpVariableName        = "name"
+	rpVariableValue       = "value"
+	rpSecretVariableValue = "secret_value"
+	rpVariableIsSecret    = "is_secret"
 )
 
 // ResourceRunPipeline schema and implementation for queue build resource
@@ -83,27 +83,25 @@ func ResourceRunPipeline() *schema.Resource {
 					},
 				},
 			},
-
-
 		},
 	}
 }
 func resourceAzureRunPipelineCreate(d *schema.ResourceData, m interface{}) error {
 	clients := m.(*client.AggregatedClient)
- 	RunPipeline, projectName,PipelineId,err := expandRunPipeline(d, true)
+	RunPipeline, projectName, PipelineId, err := expandRunPipeline(d, true)
 
 	if err != nil {
 		return fmt.Errorf("Error converting terraform data model to AzDO RunPipeline reference: %+v", err)
 	}
 
-	createdRunPipeline, err := createAzureRunPipeline(clients, RunPipeline, projectName,PipelineId)
+	createdRunPipeline, err := createAzureRunPipeline(clients, RunPipeline, projectName, PipelineId)
 	if err != nil {
 		return fmt.Errorf("Error creating agent pool in Azure DevOps: %+v", err)
 	}
 
 	//flattenRunPipeline(d, createdRunPipeline, projectName)
 
-	err = waitForRunPipeline(clients, createdRunPipeline,projectName,PipelineId)
+	err = waitForRunPipeline(clients, createdRunPipeline, projectName, PipelineId)
 	if err != nil {
 		return err
 	}
@@ -112,15 +110,14 @@ func resourceAzureRunPipelineCreate(d *schema.ResourceData, m interface{}) error
 	return resourceAzureRunPipelineRead(d, m)
 }
 
-
-func waitForRunPipeline(clients *client.AggregatedClient, createdRunPipeline *pipelines.Run,project_Name string, Pipeline_Id int) error {
+func waitForRunPipeline(clients *client.AggregatedClient, createdRunPipeline *pipelines.Run, project_Name string, Pipeline_Id int) error {
 	runID := createdRunPipeline.Id
 	stateConf := &resource.StateChangeConf{
-		Pending: []string{"InProgress","Canceling","Unknown"},
+		Pending: []string{"InProgress", "Canceling", "Unknown"},
 		Target:  []string{"Completed"},
 		Refresh: func() (interface{}, string, error) {
 			state := "InProgress"
-			pipelineStatus, err := pipelineStatusRead(clients, project_Name, Pipeline_Id,*runID)
+			pipelineStatus, err := pipelineStatusRead(clients, project_Name, Pipeline_Id, *runID)
 			if err != nil {
 				return nil, "", fmt.Errorf("Error reading repository: %+v", err)
 			}
@@ -144,25 +141,24 @@ func waitForRunPipeline(clients *client.AggregatedClient, createdRunPipeline *pi
 
 func pipelineStatusRead(clients *client.AggregatedClient, project_Name string, Pipeline_Id int, run_ID int) (*pipelines.Run, error) {
 	getRunArgs := pipelines.GetRunArgs{
-		Project: &project_Name,
+		Project:    &project_Name,
 		PipelineId: &Pipeline_Id,
 	}
 
-	runStatus,err := clients.PipelineClient.GetRun(clients.Ctx, getRunArgs)
+	runStatus, err := clients.PipelineClient.GetRun(clients.Ctx, getRunArgs)
 
 	if err != nil {
-		return nil,fmt.Errorf("Failed to locate parent repository [%s]: %+v")
+		return nil, fmt.Errorf("Failed to locate parent repository [%s]: %+v")
 	}
 
-	return runStatus,err
+	return runStatus, err
 }
 
-func createAzureRunPipeline(clients *client.AggregatedClient, RunPipeline *pipelines.RunPipelineParameters, projectName string, Pipeline_Id int ) (*pipelines.Run, error) {
+func createAzureRunPipeline(clients *client.AggregatedClient, RunPipeline *pipelines.RunPipelineParameters, projectName string, Pipeline_Id int) (*pipelines.Run, error) {
 	createRunPipeline, err := clients.PipelineClient.RunPipeline(clients.Ctx, pipelines.RunPipelineArgs{
 		RunParameters: RunPipeline,
-		Project:    &projectName,
-		PipelineId: &Pipeline_Id,
-
+		Project:       &projectName,
+		PipelineId:    &Pipeline_Id,
 	})
 
 	return createRunPipeline, err
@@ -174,15 +170,13 @@ func resourceAzureRunPipelineRead(d *schema.ResourceData, m interface{}) error {
 	Pipeline_Id := d.Get("pipeline_id").(int)
 
 	getPipelineArgs := pipelines.GetPipelineArgs{
-		Project: &Project_name,
+		Project:    &Project_name,
 		PipelineId: &Pipeline_Id,
-
 	}
 
 	//projectID, runPipelinesID, err := tfhelper.ParseProjectIDAndResourceID(d)
 
-
-	RunPipeline, err := clients.PipelineClient.GetPipeline (clients.Ctx, getPipelineArgs)
+	RunPipeline, err := clients.PipelineClient.GetPipeline(clients.Ctx, getPipelineArgs)
 
 	if err != nil {
 		if utils.ResponseWasNotFound(err) {
@@ -192,16 +186,13 @@ func resourceAzureRunPipelineRead(d *schema.ResourceData, m interface{}) error {
 		return err
 	}
 	d.Set("name", RunPipeline.Name)
-	d.Set("Folder ", RunPipeline.Folder )
+	d.Set("Folder ", RunPipeline.Folder)
 	d.Set("Id", RunPipeline.Id)
 	d.Set("Url", RunPipeline.Url)
-
 
 	//flattenRunPipeline(d, RunPipeline, projectID)
 	return nil
 }
-
-
 
 /* func flattenRunPipeline(d *schema.ResourceData, buildDefinition *pipelines.RunPipelineArgs, projectID string) {
 	d.SetId(strconv.Itoa(*buildDefinition.Id))
@@ -234,7 +225,6 @@ func resourceAzureRunPipelineRead(d *schema.ResourceData, m interface{}) error {
 	d.Set("revision", revision)
 } */
 
-
 func flattenRunPipelineVariables(d *schema.ResourceData, buildDefinition *build.BuildDefinition) interface{} {
 	if buildDefinition.Variables == nil {
 		return nil
@@ -247,9 +237,9 @@ func flattenRunPipelineVariables(d *schema.ResourceData, buildDefinition *build.
 
 		isSecret := converter.ToBool(varVal.IsSecret, false)
 		variable = map[string]interface{}{
-			rpVariableName:          varName,
-			rpVariableValue:         converter.ToString(varVal.Value, ""),
-			rpVariableIsSecret:      isSecret,
+			rpVariableName:     varName,
+			rpVariableValue:    converter.ToString(varVal.Value, ""),
+			rpVariableIsSecret: isSecret,
 		}
 
 		//read secret variable from state if exist
@@ -265,38 +255,33 @@ func flattenRunPipelineVariables(d *schema.ResourceData, buildDefinition *build.
 	return variables
 }
 
-
-func expandRunPipeline(d *schema.ResourceData, forCreate bool) (*pipelines.RunPipelineParameters  , string, int, error) {
+func expandRunPipeline(d *schema.ResourceData, forCreate bool) (*pipelines.RunPipelineParameters, string, int, error) {
 	Project := d.Get("project_name").(string)
 	variables, err := expandVariables(d)
-	Ref_Name := converter.String(d.Get("sourceBranch").(string))
-	token:= converter.String(d.Get("parameter_accessKey").(string))
+/* 	var RefName string
+	var Token string
+	Ref_Name := converter.String(d.Get("sourceBranch").(string)) */
+	//token := converter.String(d.Get("parameter_accessKey").(string))
 	PipelineId := d.Get("pipeline_id").(int)
 	if err != nil {
-		return nil, "",0,fmt.Errorf("Error expanding varibles: %+v", err)
+		return nil, "", 0, fmt.Errorf("Error expanding varibles: %+v", err)
 	}
-	Repository_resource :=pipelines.RepositoryResourceParameters{
-		RefName: Ref_Name,
-		Token: token,
-
+	Repository_resource := map[string]pipelines.RepositoryResourceParameters{
+			//RefName: Ref_Name,
+			//Token: converter.String(d.Get("parameter_accessKey").(string)),
 	}
 	RunResource := pipelines.RunResourcesParameters{
 		Repositories: &Repository_resource,
+	}
 
-		}
+	RunPipeline := pipelines.RunPipelineParameters{
+		Resources: &RunResource,
 
+		Variables: variables,
+	}
 
-		RunPipeline := pipelines.RunPipelineParameters{
-			Resources: &RunResource,
-
-			Variables: variables,
-		}
-
-
-
-	return &RunPipeline, Project ,PipelineId,nil
+	return &RunPipeline, Project, PipelineId, nil
 }
-
 
 func expandVariables(d *schema.ResourceData) (*map[string]pipelines.Variable, error) {
 	variables := d.Get(rpVariable)
@@ -327,8 +312,8 @@ func expandVariables(d *schema.ResourceData) (*map[string]pipelines.Variable, er
 			val = converter.String(varAsMap[rpVariableValue].(string))
 		}
 		expandedVars[varName] = pipelines.Variable{
-			IsSecret:      isSecret,
-			Value:         val,
+			IsSecret: isSecret,
+			Value:    val,
 		}
 	}
 

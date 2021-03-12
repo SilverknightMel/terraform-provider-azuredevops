@@ -20,7 +20,7 @@ data "azuredevops_project" "project" {
 
 
 // This section configures variable groups and a build definition
-resource "azuredevops_build_definition" "build" {
+/* resource "azuredevops_build_definition" "build" {
   project_id = data.azuredevops_project.project.id
   name       = "Sample Build Definition"
   path       = "\\ExampleFolder"
@@ -33,7 +33,7 @@ resource "azuredevops_build_definition" "build" {
   }
 
   variable_groups = [azuredevops_variable_group.vg.id]
-}
+} */
 
 // This section configures an Azure DevOps Variable Group
 resource "azuredevops_variable_group" "vg" {
@@ -59,13 +59,13 @@ resource "azuredevops_variable_group" "vg" {
 }
 
 // This section configures an Azure DevOps Git Repository with branch policies
-resource "azuredevops_git_repository" "repository" {
+/* resource "azuredevops_git_repository" "repository" {
   project_id = data.azuredevops_project.project.id
   name       = "Sample Repo"
   initialization {
     init_type = "Clean"
   }
-}
+} */
 
 
  output "azuredevops_project" {

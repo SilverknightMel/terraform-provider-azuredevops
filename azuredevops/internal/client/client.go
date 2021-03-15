@@ -84,18 +84,17 @@ func GetAzdoClient(azdoPAT string, organizationURL string, tfVersion string) (*A
 		return nil, err
 	}
 
-
 	pipelineClient := pipelines.NewClient(ctx, connection)
 	if err != nil {
 		log.Printf("getAzdoClient(): build.NewClient failed.")
 		return nil, err
 	}
-/* 	pipelineClient, err := pipelines.NewClient(ctx, Context, connection *azuredevops.Connection)
-	if err != nil {
-		log.Printf("getAzdoClient(): pipelines.NewClient failed.")
-		return nil, err
-	}
- */
+	/* 	pipelineClient, err := pipelines.NewClient(ctx, Context, connection *azuredevops.Connection)
+	   	if err != nil {
+	   		log.Printf("getAzdoClient(): pipelines.NewClient failed.")
+	   		return nil, err
+	   	}
+	*/
 	// client for these APIs (monitor async operations...):
 	//	https://docs.microsoft.com/en-us/rest/api/azure/devops/operations/operations?view=azure-devops-rest-5.1
 	operationsClient := operations.NewClient(ctx, connection)

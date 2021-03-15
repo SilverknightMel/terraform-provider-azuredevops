@@ -1,4 +1,4 @@
-﻿package pipelines
+package pipelines
 
 import (
 	"fmt"
@@ -258,17 +258,18 @@ func flattenRunPipelineVariables(d *schema.ResourceData, buildDefinition *build.
 func expandRunPipeline(d *schema.ResourceData, forCreate bool) (*pipelines.RunPipelineParameters, string, int, error) {
 	Project := d.Get("project_name").(string)
 	variables, err := expandVariables(d)
-/* 	var RefName string
-	var Token string
-	Ref_Name := converter.String(d.Get("sourceBranch").(string)) */
-	//token := converter.String(d.Get("parameter_accessKey").(string))
+	mapkey := "testonly"
+	Ref_Name := converter.String(d.Get("sourceBranch").(string))
+	token := converter.String(d.Get("parameter_accessKey").(string))
 	PipelineId := d.Get("pipeline_id").(int)
 	if err != nil {
 		return nil, "", 0, fmt.Errorf("Error expanding varibles: %+v", err)
 	}
 	Repository_resource := map[string]pipelines.RepositoryResourceParameters{
-			//RefName: Ref_Name,
-			//Token: converter.String(d.Get("parameter_accessKey").(string)),
+		mapkey: {
+			RefName: Ref_Name,
+			Token:   token,
+		},
 	}
 	RunResource := pipelines.RunResourcesParameters{
 		Repositories: &Repository_resource,

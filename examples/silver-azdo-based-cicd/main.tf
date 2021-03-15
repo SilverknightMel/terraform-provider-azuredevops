@@ -18,6 +18,9 @@ data "azuredevops_project" "project" {
 
 }
 
+resource "azuredevops_pipelines_run" "runPipeline" {
+
+}
 
 // This section configures variable groups and a build definition
 /* resource "azuredevops_build_definition" "build" {
